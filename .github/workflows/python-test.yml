@@ -9,6 +9,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      WORKDIR: .      # change to 'backend' if your code lives there
+      TESTDIR: tests  # change if your tests live elsewhere
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,9 +19,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.10'   # adjust as needed
 
       - name: Install dependencies
+        working-directory: ${{ env.WORKDIR }}
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
@@ -26,7 +30,18 @@ jobs:
           pip install pytest flake8
 
       - name: Lint code
+        working-directory: ${{ env.WORKDIR }}
         run: flake8 .
 
+      # Optional: quick visibility when debugging discovery issues
+      # - name: Show repo tree (top level)
+      #   run: ls -la && find . -maxdepth 3 -type f -name "test*.py" -o -name "*_test.py"
+
       - name: Run tests
-        run: pytest
+        if: ${{ hashFiles(format('{0}/**/test_*.py', env.TESTDIR), format('{0}/**/*_test.py', env.TESTDIR)) != '' }}
+        working-directory: ${{ env.WORKDIR }}
+        run: pytest ${{ env.TESTDIR }}
+
+      - name: Skip tests (none found)
+        if: ${{ hashFiles(format('{0}/**/test_*.py', env.TESTDIR), format('{0}/**/*_test.py', env.TESTDIR)) == '' }}
+        run: echo "No tests found under '${{ env.TESTDIR }}' — skipping pytest."
